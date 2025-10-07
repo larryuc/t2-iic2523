@@ -1,0 +1,6 @@
+LOGS
+criminal=no hay-fue un accidente
+arma homicida=no encontramos
+BASE DE DATOS
+arma homicida=no encontramos
+criminal=no hay-fue un accidente

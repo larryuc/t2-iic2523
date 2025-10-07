@@ -1,0 +1,7 @@
+LOGS
+criminal=Variable no existe
+arma homicida=cuchillo
+criminal=Variable no existe
+arma homicida=Variable no existe
+BASE DE DATOS
+No hay datos

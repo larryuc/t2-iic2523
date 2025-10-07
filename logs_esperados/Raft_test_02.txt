@@ -1,0 +1,9 @@
+LOGS
+sospechoso=Variable no existe
+sospechoso=Hitomi
+crimen=asesinato por romance fallido
+fallecidos=1
+BASE DE DATOS
+fallecidos=1
+sospechoso=Hitomi
+crimen=asesinato por romance fallido

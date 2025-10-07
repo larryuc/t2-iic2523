@@ -1,0 +1,41 @@
+A,1;B,5;C,4;D,3;E,2 # Empieza elección de Líder: A.
+
+Send;ADD-fallecidos-1                   # Acción 1
+Spread;[A,B,C,D,E]
+# Acción 1 logra consolidación directa.
+
+Send;SET-sospechoso-Hitomi              # Acción 2
+Spread;[B]
+Log;sospechoso
+# Enviar Acción 2 y todavía no se logra consenso. No hay consolidación.
+
+Spread;[C]
+Log;sospechoso
+# Propagar acción 2, se logra consolidación directa.
+
+Stop;A
+# Se cae el líder, se elige el siguiente: C
+
+Send;SET-crimen-asesinato               # Acción 3
+# Enviar Acción 3 a C, pero no propaga. No hay consolidación.
+
+Start;A
+Stop;C
+# Vuelve A y se cae el líder. Se elige el siguiente: A
+
+Send;SET-sospechoso-Gin                 # Acción 4
+Send;SET-victima-Ran                    # Acción 5
+Send;SET-crimen-secuestro               # Acción 6
+# Enviar Acción 4, 5 y 6 a A, pero no propaga. No hay consolidación
+
+Start;C
+Stop;A
+Start;A
+# Vuelve C y se cae el líder. Se elige el siguiente: C. Después vuelve A.
+
+Send;ADD-crimen- por romance fallido    # Acción 7
+Spread;[A,B,C,D,E]
+# Acción 7 logra consolidación directa. La acción 3 logra consolidación indirecta.
+
+Log;crimen
+Log;fallecidos

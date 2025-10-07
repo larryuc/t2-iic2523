@@ -1,0 +1,30 @@
+A;B;C                # Nodos aceptantes
+Takagi;Kogoro        # Nodos proponentes
+
+Accept;Kogoro;1;SET-sospechoso-yukiko             # Acción 1
+# Acción 1 (de Kogoro) es inválida porque no hizo prepare con dicho identificador.
+# El nodo Kogoro no enviará dicho accept.
+
+Prepare;Kogoro;10
+# Kogoro prepara acción 2
+
+Prepare;Takagi;20
+# Takagi prepara acción 3
+
+Accept;Kogoro;10;SET-sospechoso-gin               # Acción 2
+# Acción 2 será rechazada porque los nodos aceptan solo acciones con identificador >= 20.
+
+Accept;Takagi;20;SET-lugar-Distrito Beika         # Acción 3
+# Takagi propone acción 3 y logra que se la acepten
+
+Prepare;Kogoro;100
+# Kogoro prepara acción 4, pero se entera que la acción 3 ya fue aceptada.
+
+Accept;Kogoro;100;ADD-lugar- | Casa de Agasa      # Acción 4
+# En vez de enviar la acción 4, el algoritmo obliga que se envíe la acción 3 que ya fue aceptada con n=20.
+
+
+Log;lugar      # Se verifica la variable antes de consolidar.
+Learn          # Se consolida acción 3 y se reinician los nodos activos.
+Log;lugar      # Se verifica la variable después de consolidar.
+Log;sospechoso # Se verifica otra variable.

@@ -1,0 +1,38 @@
+A,1;B,5;C,3 # Empieza elección de líder: A.
+
+Stop;a
+Start;uwu
+# 2 eventos inválidos porque no existen los nodos con esos ID
+
+Send;SET-arma homicida-cuchillo           # Acción 1
+Spread;[A,B,C]
+# Acción 1 logra consolidación directa.
+
+Send;SET-criminal-vecino de la víctima    # Acción 2
+# Enviar Acción 2 a A, pero no propaga. No hay consolidación.
+
+Stop;A
+# Se cae el líder, se elige el siguiente: C
+
+Send;SET-criminal-pareja de la víctima    # Acción 3
+# Enviar Acción 3, pero no propaga. No hay consolidación.
+
+Start;A
+Stop;C
+# Vuelve A y se cae el líder. Se elige el siguiente: A
+
+Spread;[A,B,C]
+# A propaga sus acciones al nodo B y C aunque C está caído. 
+# Aunque hay mayoría en la acción 2, esta no cumple con los criterios 
+# de consolidación directa o indirecta. 
+
+Log;criminal
+Log;arma homicida
+
+Send;DEL-arma homicida                    # Acción 4
+Send;DEL-criminal                         # Acción 5
+Spread;[A,B,C]
+# Acción 4 y 5 logran consolidación directa. La acción 2 logra consolidación indirecta.
+
+Log;criminal
+Log;arma homicida

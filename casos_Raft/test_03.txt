@@ -1,0 +1,43 @@
+A,1;B,5;C,3;D,9;E,11 # Empieza elección de líder: A.
+
+Send;SET-arma homicida-no encontramos           # Acción 1
+Spread;[A,B,C]
+# Acción 1  logra consolidación directa.
+
+Send;SET-criminal-vecino de la víctima    # Acción 2
+# Enviar Acción 2 a A, pero no propaga. No hay consolidación.
+
+Stop;A
+Stop;C
+Stop;B
+Stop;D
+Stop;E
+# Se caen todos los nodos
+
+Send;SET-criminal-pareja de la víctima    # Acción 3
+# No se procesa porque no hay líder
+
+Start;C
+# Vuelve C, pero no hay mayoría para tener líder
+
+Send;SET-criminal-amante de la víctima     # Acción 4
+# No se procesa porque no hay líder
+
+Start;B
+Start;D
+# Vuelve B y D, hay mayoría para tener líder. Será C.
+
+Start;A;
+Start;E;
+# Vuelve A y E, aunque ya hay líder.
+
+Send;SET-criminal-no hay-fue un accidente    # Acción 5
+Spread;[B]
+# Acción 5 se manda a un solo nodo. No logra mayoría todavía, no hay consolidación
+
+Send;SET-criminal-FFFFFFFFF    # Acción 6
+Spread;[D]
+# Acción 6 se manda a un nodo. No logra mayoría todavía, no hay consolidación
+# No obstante, la acción 5 si logró mayoria y se consolida
+Log;criminal
+Log;arma homicida

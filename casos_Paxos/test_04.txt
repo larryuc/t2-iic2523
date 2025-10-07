@@ -1,0 +1,57 @@
+A;B;C
+Conan
+
+Stop;B
+
+# 2 eventos inválidos porque no existen. 
+Stop;Conan      # Stop solo va con nodos aceptantes, no con proponentes
+Prepare;conan;2 # conan no existe como nodo proponente, sino que es Conan.
+
+Prepare;Conan;2
+Stop;C
+# Hay 2 nodos activos. Se logra mayoría, pero luego se cae C.
+
+Accept;Conan;2;ADD-kaito-. No es real :c                   # Acción 1
+# Nodo A es el único que acepta acción 1.
+
+Prepare;Conan;10
+# Prepare determina que no se logrará mayoría con 1 solo nodo activo.
+
+Accept;Conan;3;SET-kaito-malvado                 # Acción 2
+# Conan no enviará el mensaje Accept
+
+Start;B
+Start;C
+Stop;A
+
+Prepare;Conan;12
+# Se prepara la acción 3. Se logra mayoría.
+
+Accept;Conan;12;SET-kaito-husbando                  # Acción 3
+# Nodos B y C aceptan acción 3.
+
+Learn
+# Se consolida la acción 3 por mayoría y se reinician los nodos activos
+
+Prepare;Conan;11
+# Hay 2 nodos activos, se logra mayoría
+
+Stop;B
+Accept;Conan;11;SET-kaito-god                   # Acción 4
+# Nodo C es el único que acepta acción 4.
+
+Start;A
+Start;B
+
+Prepare;Conan;13
+# Los 3 nodos responden. C dice que tiene promesa de ID 11 (acción 4) 
+# Mientras que A tiene promesa de ID 2 (acción 1).
+# Conan respeta promesa de ID Mayor (acción 4)
+
+Accept;Conan;13;SET-kaito-Kid                   # Acción 5
+# Se envía la acción 4 en vez de la acción 5. Todos los nodos aceptan acción 4.
+
+
+Log;kaito # Se verifica la variable antes de consolidar por segunda vez
+Learn     # Se consolida la acción 4
+Log;kaito # Se verifica la variable después de consolidar por segunda vez

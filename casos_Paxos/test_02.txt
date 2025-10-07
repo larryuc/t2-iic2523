@@ -1,0 +1,41 @@
+A;B;C
+Conan
+
+Stop;B
+
+Prepare;Conan;2
+Stop;C
+# Hay 2 nodos activos. Se logra mayoría, pero luego se cae C.
+
+Accept;Conan;2;SET-kaito-kid                   # Acción 1
+# Nodo A es el único que acepta acción 1.
+
+Prepare;Conan;10
+Accept;Conan;10;SET-kaito-malvado               # Acción 2
+# Prepare determina que no se logrará mayoría con 1 solo nodo activo.
+# Conan no enviará el mensaje Accept
+
+Start;B
+Start;C
+Stop;A
+
+Prepare;Conan;12
+# Se prepara la acción 3. Se logra mayoría.
+
+Accept;Conan;12;SET-kaito-husbando             # Acción 3
+# Nodos B y C aceptan acción 3.
+
+Learn
+# Se consolida la acción 3 por mayoría y se reinician los nodos activos
+
+Start;A
+
+Prepare;Conan;13
+# Conan prepara acción 4, pero se entera que la acción 1 ya fue aceptada por nodo A.
+
+Accept;Conan;13;SET-kaito-ladron               # Acción 4
+# En vez de enviar la acción 4, se enviará la acción 1.
+
+Log;kaito # Se verifica la variable antes de consolidar por segunda vez.
+Learn     # Se consolida la acción 1.
+Log;kaito # Se verifica la variable después de consolidar por segunda vez.
