@@ -1,7 +1,7 @@
 import subprocess
 import os
 
-COMANDO_PYTHON = "python3"
+COMANDO_PYTHON = "python"
 
 
 def ejecutar_tests(modo, ruta_entrada, mostrar_prints, tiempo_maximo):
@@ -50,8 +50,8 @@ def verificar_tests(modo, test):
             continue
         correctos_logs += 1
 
-    set_db_alumno = set(archivo_alumno[index_base_datos_alumno+1:])
-    set_db_referencia = set(archivo_referencia[index_base_datos_referencia+1:])
+    set_db_alumno = set(archivo_alumno[index_base_datos_alumno + 1:])
+    set_db_referencia = set(archivo_referencia[index_base_datos_referencia + 1:])
 
     # Ver cuantos datos correctos del alumno están en la base de datos
     # Descontar si el aluno tiene más datos que la solución

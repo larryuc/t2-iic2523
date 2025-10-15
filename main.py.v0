@@ -1,0 +1,147 @@
+# ------------------------------------------------------------------------------------
+# Pontificia Universidad Católica de Chile
+# Escuela de Ingeniería — Departamento de Ciencia de la Computación
+# Curso: IIC2523 - Sistemas Distribuidos
+# Evaluación: Tarea 2 - Simulación de algoritmos de consenso (Paxos y Raft)
+#
+# Archivo: main.py
+# Autor: Larry Andrés Uribe Araya
+#
+# ------------------------------------------------------------------------------------
+# Declaración de uso de herramientas generativas (política oficial de IA)
+# ------------------------------------------------------------------------------------
+# Parte del presente código fue desarrollado con asistencia de ChatGPT (GPT-5, OpenAI).
+# El código fue revisado, modificado y validado críticamente por el autor antes de su
+# inclusión en esta entrega, conforme a las políticas establecidas en el Syllabus del
+# curso IIC2523 y al Código de Honor de la Pontificia Universidad Católica de Chile.
+# Referencia oficial: https://github.com/IIC2523-UC/Syllabus-2025-2/discussions
+#
+# Cumple con:
+# - Citación explícita del uso de IA (Sección 7 del enunciado)
+# - Análisis crítico del código (Sección 10 del enunciado)
+# - Restricciones formales (PEP8, ≤100 caracteres por línea, ≤400 líneas por archivo)
+# ------------------------------------------------------------------------------------
+
+"""
+main.py
+
+Punto de entrada para ejecutar la simulación de Paxos o Raft en la T2 IIC2523.
+Uso:
+    python3 main.py Paxos <ruta/test.txt>
+    python3 main.py Raft  <ruta/test.txt>
+"""
+
+from __future__ import annotations
+import os
+import sys
+from typing import List, Tuple, Dict
+from database import Database
+
+
+# ------------------------------------------------------------------------------------
+# Clases base de simuladores (estructura guiada con asistencia de ChatGPT, GPT-5)
+# ------------------------------------------------------------------------------------
+class BaseSimulator:
+    def __init__(self, path: str) -> None:
+        self.path = path
+        self.db = Database()
+        self.log_queries: List[str] = []
+
+    def run(self) -> Tuple[List[str], Dict[str, str]]:
+        raise NotImplementedError
+
+
+class PaxosSimulator(BaseSimulator):
+    def run(self) -> Tuple[List[str], Dict[str, str]]:
+        log_lines: List[str] = []
+        try:
+            with open(self.path, "r", encoding="UTF-8") as f:
+                for raw in f:
+                    line = raw.strip()
+                    if not line or line.startswith("#"):
+                        continue
+                    line = line.split("#", 1)[0].strip()
+                    if not line:
+                        continue
+
+                    if line.startswith("Log;"):
+                        var = line.split(";", 1)[1]
+                        value = self.db.log_value(var)
+                        log_lines.append(f"{var}={value}")
+        except FileNotFoundError:
+            pass
+        return log_lines, self.db.snapshot()
+
+
+class RaftSimulator(BaseSimulator):
+    def run(self) -> Tuple[List[str], Dict[str, str]]:
+        log_lines: List[str] = []
+        try:
+            with open(self.path, "r", encoding="UTF-8") as f:
+                for raw in f:
+                    line = raw.strip()
+                    if not line or line.startswith("#"):
+                        continue
+                    line = line.split("#", 1)[0].strip()
+                    if not line:
+                        continue
+
+                    if line.startswith("Log;"):
+                        var = line.split(";", 1)[1]
+                        value = self.db.log_value(var)
+                        log_lines.append(f"{var}={value}")
+        except FileNotFoundError:
+            pass
+        return log_lines, self.db.snapshot()
+
+
+# ------------------------------------------------------------------------------------
+# Escritura de salida - sección LOGS y BASE DE DATOS
+# ------------------------------------------------------------------------------------
+def write_output(algorithm: str, input_path: str, log_lines: List[str],
+                 final_db: Dict[str, str]) -> str:
+    os.makedirs("logs", exist_ok=True)
+    test_name = os.path.basename(input_path)
+    out_path = os.path.join("logs", f"{algorithm}_{test_name}.txt")
+
+    with open(out_path, "w", encoding="UTF-8") as out:
+        out.write("LOGS\n")
+        if not log_lines:
+            out.write("No hubo logs\n")
+        else:
+            for line in log_lines:
+                out.write(f"{line}\n")
+
+        out.write("BASE DE DATOS\n")
+        if not final_db:
+            out.write("No hay datos\n")
+        else:
+            for k in sorted(final_db.keys()):
+                out.write(f"{k}={final_db[k]}\n")
+
+    return out_path
+
+
+# ------------------------------------------------------------------------------------
+# Función principal (main)
+# ------------------------------------------------------------------------------------
+def main(argv: List[str]) -> int:
+    if len(argv) != 3:
+        print("Uso: python3 main.py <Paxos|Raft> <ruta/test.txt>")
+        return 1
+
+    algorithm, path = argv[1], argv[2]
+
+    if algorithm not in ("Paxos", "Raft"):
+        print("Error: algoritmo debe ser 'Paxos' o 'Raft'.")
+        return 1
+
+    sim = PaxosSimulator(path) if algorithm == "Paxos" else RaftSimulator(path)
+    log_lines, final_db = sim.run()
+    out = write_output(algorithm, path, log_lines, final_db)
+    print(f"Archivo generado: {out}")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main(sys.argv))

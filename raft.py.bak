@@ -1,0 +1,345 @@
+# ------------------------------------------------------------------------------------
+# Pontificia Universidad Católica de Chile
+# Escuela de Ingeniería — Departamento de Ciencia de la Computación
+# Curso: IIC2523 - Sistemas Distribuidos
+# Evaluación: Tarea 2 - Simulación de algoritmos de consenso (Paxos y Raft)
+#
+# Archivo: raft.py
+# Autor: Larry Andrés Uribe Araya
+# ------------------------------------------------------------------------------------
+# Declaración de uso de herramientas generativas (política oficial de IA)
+# ------------------------------------------------------------------------------------
+# Parte del presente código fue desarrollado con asistencia de ChatGPT (GPT-5, OpenAI),
+# revisado y validado críticamente por el autor antes de su inclusión en esta entrega,
+# conforme al Syllabus del curso y el Código de Honor.
+# ------------------------------------------------------------------------------------
+
+from __future__ import annotations
+from dataclasses import dataclass, field
+from typing import Dict, List, Optional, Tuple
+from database2 import Database
+
+
+@dataclass
+class NodeState:
+    active: bool = True
+    timeout: int = 0
+    log: List[Tuple[int, str]] = field(default_factory=list)  # (term, comando)
+
+
+class RaftSimulator:
+    """Simulador simplificado de Raft adaptado al formato de casos."""
+
+    def __init__(self, path: str) -> None:
+        self.path = path
+        self.db = Database()
+        self.nodes: Dict[str, NodeState] = {}
+        self.leader: Optional[str] = None
+        self.term: int = 0
+        self.commit_index: int = 0
+        self.last_applied: int = 0
+
+    # -------------------- Utilidades --------------------
+    @staticmethod
+    def _clean(line: str) -> str:
+        if "#" in line:
+            before, _, _ = line.partition("#")
+            line = before
+        return line.strip()
+
+    @staticmethod
+    def _normalize_key(cmd: str) -> str:
+        """
+        Normaliza las claves en los comandos Raft para asegurar consistencia
+        entre SET, ADD y DEL (corrige espacios/guiones bajos).
+        """
+        if not cmd:
+            return cmd
+
+        op = cmd.split("-", 1)[0]
+        parts = cmd.split("-", 2)
+
+        # Asegurar formato consistente en claves
+        if len(parts) >= 2:
+            key = parts[1].replace("_", " ")
+            if op in ("SET", "ADD", "DEL"):
+                parts[1] = key
+                return "-".join(parts)
+        return cmd
+
+
+
+
+
+
+    def _active_ids(self) -> List[str]:
+        return [nid for nid, st in self.nodes.items() if st.active]
+
+    def _majority(self) -> int:
+        """Mayoría sobre nodos ACTIVOS (quórum en el cluster disponible)."""
+        total_activos = len(self._active_ids())
+        return (total_activos // 2) + 1 if total_activos > 0 else 1
+
+
+
+
+    def _leader_log(self) -> List[Tuple[int, str]]:
+        return self.nodes[self.leader].log if self.leader else []
+    
+    def _pick_leader(self):
+        activos = [nid for nid, n in self.nodes.items() if n.active]
+        if not activos:
+            print("[DEBUG] No hay candidatos a líder.")
+            self.lider = None
+            return
+
+        # --- Paso 1: elegir líder más actualizado
+        # Preferimos quien tenga el log más largo y menor timeout
+        self.lider = max(activos, key=lambda nid: (len(self.nodes[nid].log), -self.nodes[nid].timeout))
+        self.term += 1
+        nuevo_term = self.term
+        self.nodes[self.lider].term = nuevo_term
+        print(f"[DEBUG] Nuevo líder elegido: {self.lider} (term={self.term})")
+
+        # --- Paso 2: reconstruir log consistente por mayoría
+        maj = (len(activos) // 2) + 1
+        max_len = max(len(self.nodes[nid].log) for nid in activos)
+        committed_log = []
+
+        for i in range(max_len):
+            conteo = {}
+            for nid in activos:
+                log = self.nodes[nid].log
+                if len(log) > i:
+                    entrada = log[i]
+                    conteo[entrada] = conteo.get(entrada, 0) + 1
+            if conteo:
+                mayor = max(conteo.values())
+                if mayor >= maj:
+                    committed_log.append(max(conteo.items(), key=lambda x: x[1])[0])
+                else:
+                    break
+            else:
+                break
+
+        # --- Paso 3: truncar logs inconsistentes y alinear al líder
+        for nid in activos:
+            self.nodes[nid].log = committed_log.copy()
+
+        # --- Paso 4: reconstruir base confirmada
+        self.db = Database()
+        for _, cmd in committed_log:
+            self.db.apply_action(self._normalize_key(cmd))
+
+        self.commit_index = len(committed_log)
+        self.last_applied = self.commit_index
+
+        print(f"[DEBUG] Log del líder {self.lider} tras elección: {committed_log}")
+
+
+    def _recompute_commit_and_apply(self) -> None:
+        """Recalcula commit_index usando mayoría de NODOS ACTIVOS y aplica incrementalmente."""
+        if not self.leader or self.leader not in self.nodes:
+            print("[DEBUG] ❌ No hay líder válido para commit.\n")
+            return
+
+        leader_state = self.nodes[self.leader]
+        if not leader_state.active:
+            print(f"[DEBUG] ⚠️ Líder {self.leader} inactivo, no se consolida.\n")
+            return
+
+        leader_log = leader_state.log
+        majority = self._majority()
+        activos = set(self._active_ids())
+
+        print(f"[DEBUG] === RECOMPUTE COMMIT === líder={self.leader}, term={self.term}")
+        print(f"[DEBUG] Activos={activos} | Mayoría requerida={majority}")
+        print(f"[DEBUG] Log líder: {leader_log}")
+
+        # Índices que alcanzan mayoría (contando SOLO nodos ACTIVOS)
+        indices_con_mayoria: List[int] = []
+        for i, (_, action) in enumerate(leader_log):
+            count = 0
+            for nid in activos:
+                st = self.nodes[nid]
+                if len(st.log) > i and st.log[i][1] == action:
+                    count += 1
+            print(f"[DEBUG]   idx={i} action='{action}' replicas_activas={count}")
+            if count >= majority:
+                indices_con_mayoria.append(i)
+
+        if not indices_con_mayoria:
+            print("[DEBUG] ⚠️ Ninguna entrada alcanzó mayoría activa; commit no avanza.")
+            return
+
+        ultimo_idx = indices_con_mayoria[-1]
+        new_commit = max(self.commit_index, ultimo_idx + 1)
+        if new_commit == self.commit_index:
+            print(f"[DEBUG] ℹ️ commit_index se mantiene en {self.commit_index}")
+            return
+
+        print(f"[DEBUG] ✅ Avance commit_index {self.commit_index} → {new_commit}")
+        # Aplicación INCREMENTAL (no reseteamos BD)
+        for _, action in leader_log[self.commit_index:new_commit]:
+            print(f"[APPLY] {action}")
+            self.db.apply_action(action)
+
+        self.commit_index = new_commit
+        self.last_applied = self.commit_index
+        print(f"[DEBUG] === FIN RECOMPUTE === commit_index={self.commit_index} snapshot={self.db.snapshot()}\n")
+
+
+    # -------------------- Eventos --------------------
+    def _send(self, action: str) -> None:
+        """El líder agrega la acción a su log (normalizada) pero no la aplica aún hasta commit."""
+        print(f"[SEND] Acción recibida: {action}")
+        action = self._normalize_key(action)
+
+        # Si no hay líder o está inactivo, elegimos uno nuevo
+        if not self.leader or self.leader not in self.nodes or not self.nodes[self.leader].active:
+            print(f"[DEBUG] El líder {self.leader} está inactivo o indefinido. Reasignando...")
+            self._pick_leader()
+
+        # Si sigue sin haber líder, abortamos
+        if not self.leader:
+            print("[ERROR] No se pudo asignar líder en _send.")
+            return
+
+        st = self.nodes[self.leader]
+
+        # Agregar la acción al log del líder (término actual)
+        st.log.append((self.term, action))
+        print(f"[DEBUG] Log del líder {self.leader}: {st.log}")
+
+    def _spread(self, targets: Optional[List[str]]) -> None:
+        """Propaga el log del líder a otros nodos activos y recalcula commit."""
+        if not self.leader or self.leader not in self.nodes:
+            print("[DEBUG] No hay líder válido en _spread.")
+            return
+        src_state = self.nodes[self.leader]
+        leader_log = src_state.log
+        if not leader_log:
+            print("[DEBUG] Nada que propagar.")
+            return
+
+        if not targets:
+            dests = [nid for nid in self._active_ids() if nid != self.leader]
+        else:
+            dests = [t for t in targets if t in self._active_ids() and t != self.leader]
+
+        print(f"[SPREAD] Desde líder {self.leader} hacia {dests}")
+        for d in dests:
+            dst = self.nodes[d]
+            k = 0
+            while k < min(len(dst.log), len(leader_log)) and dst.log[k] == leader_log[k]:
+                k += 1
+            if k < len(dst.log):
+                dst.log = dst.log[:k]
+            if k < len(leader_log):
+                dst.log.extend(leader_log[k:])
+            print(f"[DEBUG] Nodo {d} sincronizado. Log: {dst.log}")
+
+        self._recompute_commit_and_apply()
+
+    def _event_start(self, nid: str) -> None:
+        if nid in self.nodes:
+            self.nodes[nid].active = True
+            print(f"[EVENT] Nodo {nid} iniciado.")
+            if not self.leader or not self.nodes.get(self.leader, NodeState()).active:
+                self._pick_leader()
+            self._recompute_commit_and_apply()
+
+    def _event_stop(self, nid: str) -> None:
+        if nid in self.nodes:
+            was_leader = (nid == self.leader)
+            self.nodes[nid].active = False
+            print(f"[EVENT] Nodo {nid} detenido.")
+            if was_leader:
+                self._pick_leader()
+            self._recompute_commit_and_apply()
+
+    def _event_log(self, var: str, out: List[str]) -> None:
+        self._recompute_commit_and_apply()
+        val = self.db.log_value(var)
+        print(f"[LOG] {var}={val}")
+        out.append(f"{var}={val}")
+
+    # -------------------- Ejecución --------------------
+    def run(self) -> Tuple[List[str], Dict[str, str]]:
+        print(f"[RUN] Ejecutando archivo: {self.path}")
+        with open(self.path, "r", encoding="utf-8") as f:
+            raw_lines = f.readlines()
+
+        lines = [self._clean(x) for x in raw_lines]
+        lines = [x for x in lines if x]
+        print(f"[DEBUG] Total líneas procesadas: {len(lines)}")
+
+        out: List[str] = []
+        if not lines:
+            print("[ERROR] Archivo vacío tras limpieza.")
+            return out, self.db.snapshot()
+
+        node_specs = [x.strip() for x in lines[0].split(";") if x.strip()]
+        print(f"[INIT] Definición de nodos: {node_specs}")
+        for tok in node_specs:
+            if "," in tok:
+                nid, t = tok.split(",", 1)
+                try:
+                    timeout = int(t)
+                except ValueError:
+                    timeout = 0
+            else:
+                nid, timeout = tok, 0
+            self.nodes[nid] = NodeState(True, timeout)
+            print(f"[INIT] Nodo {nid} creado (timeout={timeout})")
+
+        idx = 1
+        if len(lines) >= 2 and lines[1].startswith("Leader;"):
+            lid = lines[1].split(";", 1)[1].strip()
+            if lid in self.nodes:
+                self.leader = lid
+            idx = 2
+
+        if not self.leader:
+            self._pick_leader()
+        if not self.leader and self.nodes:
+            self.leader = list(self.nodes.keys())[0]
+
+        print(f"[DEBUG] Líder inicial: {self.leader} (term={self.term})")
+
+        for line in lines[idx:]:
+            if not line:
+                continue
+            print(f"[EVENT] Procesando línea: {line}")
+
+            if line.startswith("Leader;"):
+                lid = line.split(";", 1)[1].strip()
+                if lid in self.nodes and self.nodes[lid].active:
+                    self.leader = lid
+                    self.term += 1
+                    print(f"[EVENT] Líder forzado: {self.leader} (term={self.term})")
+
+            elif line.startswith("Send;"):
+                action = line.split(";", 1)[1].strip()
+                self._send(action)
+
+            elif line.startswith("Spread;"):
+                inside = line.split(";", 1)[1].strip().strip("[]")
+                targets = [t.strip() for t in inside.split(",") if t.strip()]
+                self._spread(targets)
+
+            elif line.startswith("Start;"):
+                nid = line.split(";", 1)[1].strip()
+                self._event_start(nid)
+
+            elif line.startswith("Stop;"):
+                nid = line.split(";", 1)[1].strip()
+                self._event_stop(nid)
+
+            elif line.startswith("Log;"):
+                var = line.split(";", 1)[1].strip()
+                self._event_log(var, out)
+
+        self._recompute_commit_and_apply()
+        print("[RUN] Ejecución finalizada. Estado final de BD:", self.db.snapshot())
+        return out, self.db.snapshot()

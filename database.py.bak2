@@ -1,0 +1,67 @@
+# ------------------------------------------------------------------------------------
+# Pontificia Universidad Católica de Chile
+# Curso: IIC2523 - Sistemas Distribuidos
+# Módulo: database.py (versión compatible con Python < 3.9)
+# ------------------------------------------------------------------------------------
+
+from typing import Dict
+
+
+class Database:
+    """
+    Base de datos clave-valor simplificada para la simulación de Paxos/Raft.
+    Soporta acciones:
+      - SET-variable-valor
+      - ADD-variable-valor  (concatena cadenas o suma números)
+      - DEL-variable
+    """
+
+    def __init__(self) -> None:
+        self.store: Dict[str, str] = {}
+
+    # -------------------- Aplicar acción --------------------
+    def apply_action(self, action: str) -> None:
+        """Interpreta y ejecuta una acción."""
+        parts = action.split("-", 2)
+        if not parts or len(parts) < 2:
+            return
+
+        op = parts[0].upper()
+        key = parts[1].strip()
+
+        if op == "DEL":
+            if key in self.store:
+                print(f"[DB] Eliminando {key}")
+                del self.store[key]
+            return
+
+        value = parts[2] if len(parts) > 2 else ""
+
+        if op == "SET":
+            print(f"[DB] SET {key} = {value}")
+            self.store[key] = value.strip()
+        elif op == "ADD":
+            if key in self.store:
+                old_val = self.store[key]
+                if old_val.replace(".", "", 1).isdigit() and value.strip().replace(".", "", 1).isdigit():
+                    new_val = str(float(old_val) + float(value.strip()))
+                    print(f"[DB] ADD numérico {key}: {old_val} + {value} = {new_val}")
+                    self.store[key] = new_val
+                else:
+                    sep = " " if old_val and not old_val.endswith(" ") else ""
+                    new_val = f"{old_val}{sep}{value.strip()}"
+                    print(f"[DB] ADD texto {key}: {old_val} + {value} -> {new_val}")
+                    self.store[key] = new_val
+            else:
+                self.store[key] = value.strip()
+                print(f"[DB] ADD inicial {key} = {value}")
+        else:
+            print(f"[DB] Ignorando acción desconocida: {action}")
+
+    # -------------------- Consultas --------------------
+    def log_value(self, var: str) -> str:
+        """Retorna el valor actual o 'Variable no existe'."""
+        return self.store.get(var.strip(), "Variable no existe")
+
+    def snapshot(self) -> Dict[str, str]:
+        return dict(self.store)

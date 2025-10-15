@@ -1,0 +1,149 @@
+"""
+main.py
+
+Punto de entrada de la T2 IIC2523.
+Uso:
+    python3 main.py Paxos <ruta/al/test.txt>
+    python3 main.py Raft  <ruta/al/test.txt>
+
+Este archivo:
+- Despacha al simulador correspondiente (stubs por ahora).
+- Recibe los resultados (líneas de LOG y base de datos final).
+- Escribe el archivo en `logs/[ALGORITMO]_[NOMBRE_TEST].txt` con el formato exacto.
+"""
+from __future__ import annotations
+
+import os
+import sys
+from typing import List, Tuple, Dict
+
+
+
+# ----------------- Simuladores (stubs por ahora) -----------------
+class BaseSimulator:
+    def __init__(self, path: str) -> None:
+        self.path = path
+        self.db = Database()
+        self.log_queries: List[str] = []  # Variables solicitadas con Log;Var en orden
+
+    def run(self) -> Tuple[List[str], Dict[str, str]]:
+        """
+        Debe retornar:
+            - lista de líneas de log (ya formateadas como 'var=valor' o 'var=Variable no existe')
+              en el mismo orden en que aparecieron las consultas Log;
+            - dict con la BD final (clave→valor) para la sección 'BASE DE DATOS'.
+        """
+        raise NotImplementedError
+
+
+class PaxosSimulatorStub(BaseSimulator):
+    def run(self) -> Tuple[List[str], Dict[str, str]]:
+        # Implementaremos en el siguiente paso.
+        # Por ahora, solo lee el archivo y recolecta 'Log;Variable' para no romper el flujo.
+        log_lines: List[str] = []
+        try:
+            with open(self.path, "r", encoding="UTF-8") as f:
+                for raw in f:
+                    line = raw.strip()
+                    if not line or line.startswith("#"):
+                        continue
+                    # Algunas líneas tienen comentarios en la misma línea → partir por '#'
+                    line = line.split("#", 1)[0].strip()
+                    if not line:
+                        continue
+
+                    if line.startswith("Log;"):
+                        var = line.split(";", 1)[1]
+                        value = self.db.log_value(var)
+                        log_lines.append(f"{var}={value}")
+                    # El resto de eventos (Prepare/Accept/Learn/Start/Stop) se implementarán luego.
+        except FileNotFoundError:
+            pass
+
+        return log_lines, self.db.snapshot()
+
+
+class RaftSimulator(BaseSimulator):
+    def run(self) -> Tuple[List[str], Dict[str, str]]:
+        # Implementaremos en el siguiente paso.
+        # Por ahora, solo lee el archivo y recolecta 'Log;Variable' para no romper el flujo.
+        log_lines: List[str] = []
+        try:
+            with open(self.path, "r", encoding="UTF-8") as f:
+                for raw in f:
+                    line = raw.strip()
+                    if not line or line.startswith("#"):
+                        continue
+                    line = line.split("#", 1)[0].strip()
+                    if not line:
+                        continue
+
+                    if line.startswith("Log;"):
+                        var = line.split(";", 1)[1]
+                        value = self.db.log_value(var)
+                        log_lines.append(f"{var}={value}")
+                    # El resto de eventos (Send/Spread/Start/Stop) se implementarán luego.
+        except FileNotFoundError:
+            pass
+
+        return log_lines, self.db.snapshot()
+
+
+# ----------------- Escritura de archivo de salida -----------------
+def write_output(algorithm: str,
+                 input_path: str,
+                 log_lines: List[str],
+                 final_db: Dict[str, str]) -> str:
+    """
+    Escribe el archivo de salida en logs/[ALGORITMO]_[nombreTest].txt
+    Retorna la ruta escrita.
+    """
+    os.makedirs("logs", exist_ok=True)
+    test_name = os.path.basename(input_path)
+    out_path = os.path.join("logs", f"{algorithm}_{test_name}")
+
+    with open(out_path, "w", encoding="UTF-8") as out:
+        out.write("LOGS\n")
+        if not log_lines:
+            out.write("No hubo logs\n")
+        else:
+            for line in log_lines:
+                out.write(f"{line}\n")
+
+        out.write("BASE DE DATOS\n")
+        if not final_db:
+            out.write("No hay datos\n")
+        else:
+            # Orden determinista: alfabético por variable
+            for k in sorted(final_db.keys()):
+                out.write(f"{k}={final_db[k]}\n")
+
+    return out_path
+
+
+def main(argv: List[str]) -> int:
+    if len(argv) != 3:
+        print("Uso: python3 main.py <Paxos|Raft> <ruta/al/test.txt>")
+        return 1
+
+    algorithm = argv[1]
+    path = argv[2]
+
+    if algorithm not in ("Paxos", "Raft"):
+        print("Error: algoritmo debe ser 'Paxos' o 'Raft'.")
+        return 1
+
+    if algorithm == "Paxos":
+        from paxos import PaxosSimulator
+        sim = PaxosSimulator(path)
+    else:
+        sim = RaftSimulator(path)
+
+    log_lines, final_db = sim.run()
+    out = write_output(algorithm, path, log_lines, final_db)
+    print(f"Archivo generado: {out}")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main(sys.argv))

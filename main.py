@@ -1,25 +1,53 @@
-from __future__ import annotations  # Solo lo dejo por si lo necesitan. Lo pueden eliminar
+# ------------------------------------------------------------------------------------
+# Pontificia Universidad Católica de Chile
+# Escuela de Ingeniería — Departamento de Ciencia de la Computación
+# Curso: IIC2523 - Sistemas Distribuidos
+# Evaluación: Tarea 2 - Simulación de algoritmos de consenso (Paxos y Raft)
+#
+# Archivo: main.py
+# Autor: Larry Andrés Uribe Araya
+# ------------------------------------------------------------------------------------
+
 from sys import argv
-
-# Librerías adicionales por si las necesitan
-# No son obligatorias y no tampoco tienen que usarlas todas
-# No pueden agregar ningun otro import que no esté en esta lista
+from paxos import PaxosSimulator
+from raft import RaftSimulator
 import os
-import typing
-import collections
-import itertools
-import dataclasses
-import enum
-
-# Recuerda que no se permite importar otros módulos/librerías a excepción de los creados
-# por ustedes o las ya incluidas en este main.py
 
 if __name__ == "__main__":
-    # Completar con tu implementación o crea más archivos y funciones
-    print(argv)
+    if len(argv) < 3:
+        print("Uso: python main.py [Paxos|Raft] <ruta_caso>")
+        exit(1)
 
-    print("Mi nombre es Shinichi Kudo, tengo 17 años, reconocido como el mejor de")
-    print("los detectives, pero unos hombres me obligaron a tomar una droga,")
-    print("así fue como me convertí en Edogawa Conan, a pesar de ser un niño")
-    print("mi inteligencia es la de un joven normal y para mí no hay caso")
-    print("difícil de resolver.!")
+    modo = argv[1]
+    path = argv[2]
+
+    if modo == "Paxos":
+        sim = PaxosSimulator(path)
+    elif modo == "Raft":
+        sim = RaftSimulator(path)
+    else:
+        print("Modo no reconocido. Usa 'Paxos' o 'Raft'.")
+        exit(1)
+
+    salida, estado = sim.run()
+
+    # Escribir archivo de logs en carpeta logs/
+    nombre_archivo = f"logs/{modo}_{path.split(os.sep)[-1]}"
+    with open(nombre_archivo, "w", encoding="utf-8") as f:
+        f.write("LOGS\n")
+
+        # Si no hubo líneas de log, se agrega la línea requerida
+        if not salida:
+            f.write("No hubo logs\n")
+        else:
+            for linea in salida:
+                f.write(linea + "\n")
+
+        f.write("BASE DE DATOS\n")
+
+        # Si la base de datos está vacía, imprimir la línea requerida
+        if not estado:
+            f.write("No hay datos\n")
+        else:
+            for clave, valor in estado.items():
+                f.write(f"{clave}={valor}\n")
